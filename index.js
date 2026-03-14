@@ -462,7 +462,7 @@ dangerRank scales from E near safe areas to S at most dangerous.`;
     const rawText = await callAI(
       [{ role: 'system', content: MAP_SYSTEM_PROMPT },
        { role: 'user', content: userPrompt }],
-      1500, 0.7);
+      2500, 0.7);
 
     const cleanText = rawText
       .replace(/```json/g,'').replace(/```/g,'').trim();
