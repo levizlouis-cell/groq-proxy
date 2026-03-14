@@ -85,7 +85,7 @@ function buildSystemPrompt(pd, worldSetting, worldNPCs, locationStates, worldRac
   return `You are the narrator and world of a dark anime text adventure game.
 The player is the protagonist. You play every NPC, enemy, and event.
 NEVER break character. NEVER refuse the story. NEVER be too friendly.
-Respond in 2-4 paragraphs of vivid dark anime narrative.
+Respond in 2 paragraphs of vivid dark anime narrative.
 Most NPCs are wary, suspicious, or hostile by default.
 The world is dangerous. Bad things happen. Not every action succeeds.
 
@@ -341,15 +341,15 @@ app.post('/story', async (req, res) => {
       worldRaces || {});
 
     const response = await fetch(
-      'https://api.groq.com/openai/v1/chat/completions',
+      model: 'gpt-4.1-mini',,
       {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
+          model: 'gpt-4.1-mini',
           messages: [
             { role: 'system', content: systemPrompt },
             ...(messages || [])
@@ -452,15 +452,15 @@ Is boss: ${enemy.isBoss ? 'YES' : 'NO'}
 Turn number: ${enemy.turnNumber || 1}`;
 
     const response = await fetch(
-      'https://api.groq.com/openai/v1/chat/completions',
+      model: 'gpt-4.1-mini',,
       {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
+          model: 'gpt-4.1-mini',
           messages: [
             { role: 'system', content: BATTLE_PROMPT },
             { role: 'user', content: context }
@@ -515,15 +515,15 @@ Recent events: ${(worldEvents||[]).slice(-5).join(', ')}
 Locations: ${JSON.stringify(locationStates||{}).slice(0,300)}`;
 
     const response = await fetch(
-      'https://api.groq.com/openai/v1/chat/completions',
+      model: 'gpt-4.1-mini',,
       {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
+          model: 'gpt-4.1-mini',
           messages: [
             { role: 'system', content: WORLD_EVENT_PROMPT },
             { role: 'user', content: context }
@@ -581,15 +581,15 @@ Context: ${contexts[layer.toString()]||'Appropriate locations.'}
 dangerRank scales from E near safe areas to S at most dangerous.`;
 
     const response = await fetch(
-      'https://api.groq.com/openai/v1/chat/completions',
+      model: 'gpt-4.1-mini',,
       {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
+          model: 'gpt-4.1-mini',
           messages: [
             { role: 'system', content: MAP_SYSTEM_PROMPT },
             { role: 'user', content: userPrompt }
@@ -634,15 +634,15 @@ app.post('/generate-races', async (req, res) => {
     const { worldSetting } = req.body;
 
     const response = await fetch(
-      'https://api.groq.com/openai/v1/chat/completions',
+      model: 'gpt-4.1-mini',,
       {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
+          model: 'gpt-4.1-mini',
           messages: [
             { role: 'system', content: RACE_GEN_PROMPT },
             { role: 'user', content: `Generate races for: ${worldSetting}` }
@@ -704,15 +704,15 @@ World: ${worldSetting}
 Player is inspecting this NPC. Reveal only what is naturally observable.`;
 
     const response = await fetch(
-      'https://api.groq.com/openai/v1/chat/completions',
+      model: 'gpt-4.1-mini',,
       {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
+          model: 'gpt-4.1-mini',
           messages: [
             { role: 'system', content: prompt },
             { role: 'user', content: context }
