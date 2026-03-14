@@ -2,9 +2,33 @@ const express = require('express');
 const app = express();
 app.use(express.json());
 
+const SYSTEM_PROMPT = `You are the narrator and world of a dark anime text adventure game. 
+The player is the protagonist. You play every NPC, enemy, and event in the world.
+You NEVER break character. You NEVER refuse to continue the story.
+You respond in 2-4 paragraphs of vivid dark anime narrative.
+At the end of every response add a JSON block in this exact format:
+<GAMEDATA>
+{
+  "statChanges": { "hp": 0, "strength": 0, "agility": 0, "intelligence": 0, "rank": "" },
+  "inventoryAdd": [],
+  "inventoryRemove": [],
+  "worldEvent": ""
+}
+</GAMEDATA>
+Only put non-zero values when something actually changes.
+rank only changes when player earns a promotion — use values: E, D, C, B, A, S.
+worldEvent is a one sentence summary of what just happened for world memory.
+Keep the narrative dark, intense, and cinematic like Solo Leveling or Tower of God.`;
+
 app.post('/story', async (req, res) => {
   try {
-    const { messages, systemPrompt } = req.body;
+    const { messages, worldSetting, playerData } = req.body;
+    
+    const contextPrompt = `
+World Setting: ${worldSetting || 'Unknown world'}
+Player: ${JSON.stringify(playerData || {})}
+`;
+
     const response = await fetch(
       'https://api.groq.com/openai/v1/chat/completions',
       {
@@ -16,21 +40,45 @@ app.post('/story', async (req, res) => {
         body: JSON.stringify({
           model: 'llama3-70b-8192',
           messages: [
-            { role: 'system', content: systemPrompt },
+            { role: 'system', content: SYSTEM_PROMPT + contextPrompt },
             ...messages
           ],
-          max_tokens: 400,
-          temperature: 0.8,
+          max_tokens: 600,
+          temperature: 0.85,
         })
       }
     );
+
     const data = await response.json();
-    res.json({
-      text: data.choices?.[0]?.message?.content
-        || 'The world is silent...'
-    });
+    const fullText = data.choices?.[0]?.message?.content || 'The void offers no response.';
+    
+    // Split narrative from game data
+    const gameDataMatch = fullText.match(/<GAMEDATA>([\s\S]*?)<\/GAMEDATA>/);
+    const narrative = fullText.replace(/<GAMEDATA>[\s\S]*?<\/GAMEDATA>/, '').trim();
+    
+    let gameData = {
+      statChanges: {},
+      inventoryAdd: [],
+      inventoryRemove: [],
+      worldEvent: ''
+    };
+    
+    if (gameDataMatch) {
+      try {
+        gameData = JSON.parse(gameDataMatch[1].trim());
+      } catch(e) {
+        // gameData stays as default
+      }
+    }
+
+    res.json({ narrative, gameData });
+
   } catch(e) {
-    res.status(500).json({ text: 'Error reaching the void.' });
+    console.error(e);
+    res.status(500).json({ 
+      narrative: 'The darkness swallows your action whole.',
+      gameData: {}
+    });
   }
 });
 
