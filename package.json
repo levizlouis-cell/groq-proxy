@@ -3,20 +3,9 @@
   "version": "1.0.0",
   "main": "index.js",
   "dependencies": {
-    "express": "^4.18.0"
+    "express": "4.18.0"
   },
   "scripts": {
     "start": "node index.js"
   }
 }
-```
-
-**9.** Commit that file too
-
-**10.** Go back to Render → your service → click **Settings** → under **Build & Deploy** connect to your new GitHub repo
-
-**11.** Render will automatically redeploy — wait 2 minutes for **"Live"** in green
-
-**12.** Test it by going to:
-```
-https://groq-proxy-tika.onrender.com/ping
