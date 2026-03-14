@@ -341,7 +341,7 @@ app.post('/story', async (req, res) => {
       worldRaces || {});
 
     const response = await fetch(
-      model: 'gpt-4.1-mini',
+      'https://api.openai.com/v1/chat/completions',
       {
         method: 'POST',
         headers: {
