@@ -23,11 +23,27 @@ Keep the narrative dark, intense, and cinematic like Solo Leveling or Tower of G
 app.post('/story', async (req, res) => {
   try {
     const { messages, worldSetting, playerData } = req.body;
-    
+
+    console.log("Received request for world:", worldSetting?.slice(0, 50));
+    console.log("Message count:", messages?.length);
+    console.log("API key present:", !!process.env.GROQ_API_KEY);
+
     const contextPrompt = `
 World Setting: ${worldSetting || 'Unknown world'}
 Player: ${JSON.stringify(playerData || {})}
 `;
+
+    const requestBody = {
+      model: 'llama3-70b-8192',
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT + contextPrompt },
+        ...(messages || [])
+      ],
+      max_tokens: 600,
+      temperature: 0.85,
+    };
+
+    console.log("Calling Groq API...");
 
     const response = await fetch(
       'https://api.groq.com/openai/v1/chat/completions',
@@ -37,45 +53,53 @@ Player: ${JSON.stringify(playerData || {})}
           'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          model: 'llama3-70b-8192',
-          messages: [
-            { role: 'system', content: SYSTEM_PROMPT + contextPrompt },
-            ...messages
-          ],
-          max_tokens: 600,
-          temperature: 0.85,
-        })
+        body: JSON.stringify(requestBody)
       }
     );
 
+    console.log("Groq status:", response.status);
+
     const data = await response.json();
-    const fullText = data.choices?.[0]?.message?.content || 'The void offers no response.';
-    
-    // Split narrative from game data
-    const gameDataMatch = fullText.match(/<GAMEDATA>([\s\S]*?)<\/GAMEDATA>/);
-    const narrative = fullText.replace(/<GAMEDATA>[\s\S]*?<\/GAMEDATA>/, '').trim();
-    
+
+    console.log("Groq response:", JSON.stringify(data).slice(0, 200));
+
+    if (data.error) {
+      console.error("Groq error:", data.error);
+      return res.json({
+        narrative: "The darkness speaks: " + data.error.message,
+        gameData: {}
+      });
+    }
+
+    const fullText = data.choices?.[0]?.message?.content
+      || 'The void offers no response.';
+
+    const gameDataMatch = fullText.match(
+      /<GAMEDATA>([\s\S]*?)<\/GAMEDATA>/);
+    const narrative = fullText
+      .replace(/<GAMEDATA>[\s\S]*?<\/GAMEDATA>/, '')
+      .trim();
+
     let gameData = {
       statChanges: {},
       inventoryAdd: [],
       inventoryRemove: [],
       worldEvent: ''
     };
-    
+
     if (gameDataMatch) {
       try {
         gameData = JSON.parse(gameDataMatch[1].trim());
       } catch(e) {
-        // gameData stays as default
+        console.error("GameData parse error:", e.message);
       }
     }
 
     res.json({ narrative, gameData });
 
   } catch(e) {
-    console.error(e);
-    res.status(500).json({ 
+    console.error("Server error:", e.message);
+    res.status(500).json({
       narrative: 'The darkness swallows your action whole.',
       gameData: {}
     });
