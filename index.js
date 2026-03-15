@@ -29,19 +29,15 @@ async function callAI(messages, maxTokens, temp) {
   return d.choices?.[0]?.message?.content || '';
 }
 
-// ════════════════════════════════════════
-// CONTEXT BUILDERS
-// ════════════════════════════════════════
-
 function buildNPCContext(npcs) {
   if (!npcs || !Object.keys(npcs).length) return '';
-  let s = '\nKNOWN NPCs (remember everything about them):\n';
+  let s = '\nKNOWN NPCs (remember everything):\n';
   for (const [name, n] of Object.entries(npcs)) {
     s += `- ${name}: attitude=${n.attitude||'unknown'}, level=${n.level||'?'}, race=${n.race||'?'}, age=${n.age||'?'}\n`;
-    if (n.history) s += `  history: ${n.history}\n`;
-    if (n.itemsTraded) s += `  items traded: ${n.itemsTraded}\n`;
-    if (n.promises) s += `  promises made: ${n.promises}\n`;
-    if (n.betrayals) s += `  betrayals: ${n.betrayals}\n`;
+    if (n.history)      s += `  history: ${n.history}\n`;
+    if (n.itemsTraded)  s += `  items traded: ${n.itemsTraded}\n`;
+    if (n.promises)     s += `  promises: ${n.promises}\n`;
+    if (n.betrayals)    s += `  betrayals: ${n.betrayals}\n`;
   }
   return s;
 }
@@ -86,10 +82,10 @@ function buildSystemPrompt(pd, worldSetting, worldNPCs, locationStates, worldRac
   const worldStatsStr = pd.worldStats
     ? Object.entries(pd.worldStats).map(([k,v])=>`${k}:${v}`).join(', ')
     : 'none';
-  const cursesStr  = (pd.curses||[]).map(c=>`${c.name}`).join(', ')||'none';
-  const injStr     = (pd.injuries||[]).map(i=>`${i.bodyPart}`).join(', ')||'none';
-  const bountiesStr= (pd.bounties||[]).map(b=>`${b.faction}`).join(', ')||'none';
-  const traitStr   = (pd.traits||[]).map(t=>t.name||t).join(', ')||'none';
+  const cursesStr   = (pd.curses||[]).map(c=>c.name).join(', ')||'none';
+  const injStr      = (pd.injuries||[]).map(i=>i.bodyPart).join(', ')||'none';
+  const bountiesStr = (pd.bounties||[]).map(b=>b.faction).join(', ')||'none';
+  const traitStr    = (pd.traits||[]).map(t=>t.name||t).join(', ')||'none';
 
   return `You are the narrator and living world of a dark anime text adventure RPG.
 The player is the protagonist. You play every NPC, enemy, faction, and event.
@@ -123,96 +119,73 @@ ${buildNPCContext(worldNPCs)}
 ${buildLocationContext(locationStates)}
 
 ════════════════════════════════════════
-STRICT RULES — NEVER BREAK THESE
+STRICT RULES
 ════════════════════════════════════════
 
 RULE 1 — LEVEL SCALING:
-Enemies scale with their own level. A level 1 player fighting a level 10 enemy
-will struggle and likely die. High level enemies cannot be instantly killed
-by low level players regardless of what they type.
-Enemy must be within 3 levels of player for a fair fight.
-5+ levels above player = player gets destroyed, forced to flee.
+Enemies scale with their own level.
+Level 1 player vs level 10 enemy = player loses badly.
+5+ levels above player = forced flee or death.
+High level enemies cannot be instantly killed by low level players.
 
 RULE 2 — ABILITY ENFORCEMENT:
-Player can ONLY use abilities listed in "Known abilities" above.
-If they try to use an ability NOT in that list:
-  - It fails dramatically — body rejects it, energy dissipates
-  - No damage dealt, no effect
-  - Narrate the failure vividly
-Basic unarmed actions (punch, kick, throw, tackle) are ALWAYS available.
-Context matters — cannot use fire in underwater zones.
+Player can ONLY use abilities in "Known abilities" list above.
+Unknown ability attempt = fails dramatically, no damage, narrate vividly.
+Basic unarmed actions (punch, kick, throw, tackle) always available.
+Context matters — no fire underwater, no boulder throw in corridors.
 
 RULE 3 — ITEM ENFORCEMENT:
-Player can ONLY reference items listed in "Inventory" above.
-Using an item NOT in inventory: it simply isn't there, narrate accordingly.
+Player can ONLY use items in "Inventory" above.
+Item not in inventory = it simply isn't there.
 Items are story/crafting materials — not battle consumables.
-Exception: throwing an item at an enemy consumes it and does minimal damage.
+Exception: throwing an item consumes it and does minimal damage.
 
 RULE 4 — ABILITY EARNING:
-Abilities are only granted when player:
+Only grant abilities when player:
   - Trained explicitly over multiple actions
   - Defeated a specific enemy that teaches it
-  - Found a scroll/tome/teacher in the world
+  - Found a scroll/tome/teacher
   - A major story event justified it
-NOT granted for: asking for it, single-action meditation, buying casually.
-Ability tier limits by level:
-  Level 1-5:  Basic only
-  Level 6-15: Advanced unlockable
-  Level 16+:  Mastered unlockable
-  Level 30+:  Legendary/godlike abilities possible
+NOT for: asking for it, single meditation, casual purchase.
+Tier limits: Level 1-5=Basic, Level 6-15=Advanced, Level 16+=Mastered, Level 30+=Legendary.
 
 RULE 5 — BODY MODIFICATION:
-Cannot be acquired through narration alone. Always requires:
-  - The specific item in player inventory
-  - Minimum level appropriate to power
-  - A willing NPC surgeon in the story
-  - Narrative time passing
-If requirements not met: the NPC refuses or the procedure fails.
+Requires: specific item in inventory + appropriate level + willing NPC + narrative time.
+If requirements not met: NPC refuses or procedure fails.
 
 RULE 6 — NO INSTANT KILLS:
 Enemies with HP > 1 cannot be instantly killed.
-Powerful enemies require multiple turns/actions.
-Boss enemies require a full battle.
-"I instant kill him" → does not work, describe the enemy surviving.
+Powerful enemies require multiple turns.
+Boss enemies require full battle.
 
 RULE 7 — NO TELEPORTATION:
-Player cannot instantly appear somewhere new without story justification.
 Travel takes narrative time proportional to distance.
-Fast travel only if world has established teleportation (portals/gates).
+Fast travel only if world has established teleportation systems.
 
 RULE 8 — NPC MEMORY:
-NPCs remember EVERYTHING from their history above.
-A betrayed NPC is hostile — always, no exceptions.
-A helped NPC remembers — always.
-Never reset NPC attitudes without a genuine story reason.
-NPCs have their own goals and will lie, deceive, and manipulate.
+NPCs remember EVERYTHING from their history.
+Betrayed NPC = always hostile. Helped NPC = always remembers.
+Never reset attitudes without genuine story reason.
+NPCs have own goals and will lie, deceive, manipulate.
 
 RULE 9 — WORLD CONSISTENCY:
-Destroyed buildings stay destroyed.
-Dead characters stay dead.
-World events are permanent and additive.
-Consequences of player actions ripple through the world.
+Destroyed buildings stay destroyed. Dead characters stay dead.
+Consequences ripple through the world permanently.
 
 RULE 10 — ITEM THEME:
-Items must fit the established world setting.
-Medieval fantasy = no laser guns.
-No item appears that contradicts the world's established rules.
+Items must fit the world setting. No anachronistic items.
 
 RULE 11 — STAT CAP:
-Maximum ${MAX_STAT_GAIN} total stat points gained per action.
-Maximum HP delta: ±${MAX_HP_DELTA} per action.
-Maximum XP gain: ${MAX_XP_GAIN} per action.
+Max ${MAX_STAT_GAIN} total stat points per action.
+Max HP delta: ±${MAX_HP_DELTA}. Max XP: ${MAX_XP_GAIN}.
 
 RULE 12 — BATTLE TRIGGER:
-ANY time combat begins — player attacks, enemy attacks, ambush — 
-battleTrigger MUST be set with full enemy data.
-NEVER narrate a fight without setting battleTrigger.
-Include enemy level, stats, HP, dominant stat.
+ANY combat start = battleTrigger MUST be set with full enemy data including stats and HP.
+NEVER narrate a fight without battleTrigger.
 
 RULE 13 — NPC HIGHLIGHTS:
-Every named NPC or enemy mentioned must appear in nameHighlights.
-attitude: "friendly" = green, "hostile" = red, "unknown" = white.
-Include their level if known.
+Every named NPC or enemy mentioned = must appear in nameHighlights.
+friendly=green, hostile=red, unknown=white.
 
 ════════════════════════════════════════
 RESPONSE FORMAT
@@ -245,26 +218,21 @@ Then output this block exactly:
 </GAMEDATA>
 
 FIELD RULES:
-- statChanges.hp: DELTA only. -10 = took 10 damage. 0 = no change. NEVER put current HP here.
-- statChanges.worldStats: world-specific stat deltas e.g. {"QI": 2}
-- xpGain: 0-50 normal, 50-200 boss kills. Cap: ${MAX_XP_GAIN}.
-- inventoryAdd: plain strings only e.g. ["Iron Sword", "Healing Herb"]
-- inventoryRemove: plain strings of items actually used/consumed
+- statChanges.hp: DELTA only. -10=took 10 damage. 0=no change. NEVER put current HP (${pd.hp}) here.
+- statChanges.worldStats: world-specific deltas e.g. {"QI": 2}
+- xpGain: 0-50 normal, 50-200 boss. Cap ${MAX_XP_GAIN}.
+- inventoryAdd: plain strings only e.g. ["Iron Sword", "Herb"]
+- inventoryRemove: strings of items actually consumed
 - abilityUnlocked: null OR { name:"", description:"", type:"physical|demonic|divine|fire|ice|light|shadow|cursed|holy|chaos|order|arcane|nature|void", tier:"Basic", damage:"STR x 1.0", cooldown:0 }
-  Only set when player genuinely EARNS a new ability. Goes to library only.
 - traitGained: null OR { name:"", description:"", source:"" }
 - battleTrigger: null OR { enemyName:"", enemyLevel:1, enemyHp:100, enemyMaxHp:100, enemyStr:10, enemyAgi:10, enemyInt:10, enemyDominantStat:"strength", enemyDescription:"", enemyRace:"", isBoss:false }
-  enemyHp = 50 + (enemyLevel * 20). Stats vary by enemy type.
+  enemyHp = 50 + (enemyLevel * 20). Stats vary by type.
 - npcUpdates: { "Name": { attitude:"friendly|hostile|unknown", level:1, race:"", age:"", history:"", itemsTraded:"", promises:"", betrayals:"" } }
 - nameHighlights: [ { name:"", type:"npc|enemy", attitude:"friendly|hostile|unknown", level:1 } ]
 - badEvent: null OR { type:"ambush|disaster|betrayal|curse|injury|bounty", description:"", details:{} }
-- currentLocation: where player is RIGHT NOW (empty if unchanged)
+- currentLocation: where player is NOW (empty if unchanged)
 - currentLayer: 0=ground,1=elevated,2=sky,-1=cave,-2=dungeon,-3=abyss (0 if unchanged)`;
 }
-
-// ════════════════════════════════════════
-// WORLD CREATION PROMPT
-// ════════════════════════════════════════
 
 const WORLD_CREATION_PROMPT = `You are a world builder for a dark anime text adventure RPG.
 Given a player's world description, generate their starting world data.
@@ -295,24 +263,20 @@ Return ONLY valid JSON, no markdown:
     "damage": "STR x 1.0",
     "cooldown": 0
   },
-  "startingLocation": "Location name matching one of the map locations",
-  "openingNarrative": "2 paragraphs setting the scene for this player's world"
+  "startingLocation": "Location name",
+  "openingNarrative": "2 paragraphs setting the scene vividly"
 }
 Rules:
-- Generate 4-8 races fitting the world description
-- Player race is randomly chosen from the races
-- Starting ability is random and fits the world theme
-- statBonus total across all stats should be 2-4 points max
-- Trait should be interesting and narratively meaningful`;
-
-// ════════════════════════════════════════
-// BATTLE PROMPT
-// ════════════════════════════════════════
+- Generate 4-8 races fitting the world
+- Player race randomly chosen from races
+- Starting ability random, fits world theme
+- statBonus total 2-4 points max
+- Trait must be interesting and narratively meaningful`;
 
 const BATTLE_PROMPT = `You are a battle resolver for a dark anime RPG.
 Resolve ONE turn and return ONLY valid JSON, no markdown:
 {
-  "battleLog": "1-2 vivid sentences of what happened",
+  "battleLog": "1-2 vivid sentences of what happened this turn",
   "playerHpChange": 0,
   "enemyHpChange": 0,
   "battleEnded": false,
@@ -322,19 +286,35 @@ Resolve ONE turn and return ONLY valid JSON, no markdown:
 }
 Rules:
 - playerHpChange negative = player took damage
-- enemyHpChange always negative (damage to enemy)
-- Damage scales with ability used and relevant stat vs enemy stats
-- Enemy attacks based on their dominant stat
+- enemyHpChange always negative = damage to enemy
+- If isEnemyTurn=true in context: enemy attacks, playerHpChange is negative, enemyHpChange=0
+- Scale damage with relevant stats vs target defense stats
 - xpReward and itemDrop only when playerWon=true
 - xpReward: 20 + (enemyLevel * 10), more for bosses`;
 
-// ════════════════════════════════════════
-// WORLD EVENT PROMPT
-// ════════════════════════════════════════
+const ENEMY_ABILITIES_PROMPT = `You are an ability generator for enemies in a dark anime RPG.
+Given an enemy, generate 2-3 abilities they would realistically have.
+Return ONLY valid JSON, no markdown:
+{
+  "abilities": [
+    {
+      "name": "Ability Name",
+      "description": "What it does in one sentence",
+      "type": "physical|fire|ice|shadow|etc",
+      "damage": "STR x 1.2",
+      "cooldown": 0
+    }
+  ]
+}
+Rules:
+- Abilities must fit the enemy type, race, and world
+- Scale power to enemy level
+- Include at least one basic attack with cooldown 0
+- Higher level enemies get more powerful abilities
+- Cooldowns 0-3 turns`;
 
 const WORLD_EVENT_PROMPT = `You are a world event generator for a dark anime RPG.
-Generate one passive world event that happened while player was busy.
-Player was NOT involved. The world is alive without them.
+Generate one passive world event while player was busy.
 Return ONLY valid JSON, no markdown:
 {
   "eventTitle": "Short title",
@@ -348,10 +328,6 @@ Return ONLY valid JSON, no markdown:
   "badEventForPlayer": null
 }
 badEventForPlayer: null or { type:"ambush|bounty", description:"" } — never a boolean.`;
-
-// ════════════════════════════════════════
-// MAP PROMPT
-// ════════════════════════════════════════
 
 const MAP_PROMPT = `You are a world map generator for a dark anime RPG.
 Return ONLY valid JSON, no markdown:
@@ -372,18 +348,12 @@ Return ONLY valid JSON, no markdown:
   ]
 }
 Rules:
-- 20-25 locations for layer 0. 10-15 for others.
-- x/y 0-100. 2-4 connections per location.
-- Exactly ONE isStarting=true.
-- minLevel: starting areas = 1, mid areas = 5-10, dangerous areas = 15-25.
-- No dangerRank — use minLevel instead.`;
-
-// ════════════════════════════════════════
-// NPC INSPECT PROMPT
-// ════════════════════════════════════════
+- 20-25 locations layer 0, 10-15 others
+- x/y 0-100, 2-4 connections each
+- Exactly ONE isStarting=true
+- minLevel: start=1, mid=5-10, dangerous=15-25`;
 
 const INSPECT_PROMPT = `You are an NPC inspector for a dark anime RPG.
-Based on known information, generate inspection details.
 Reveal only what makes sense given their history.
 Return ONLY valid JSON, no markdown:
 {
@@ -396,9 +366,24 @@ Return ONLY valid JSON, no markdown:
   "attitude": "friendly|hostile|unknown"
 }`;
 
-// ════════════════════════════════════════
-// ENDPOINTS
-// ════════════════════════════════════════
+async function callAI(messages, maxTokens, temp) {
+  const r = await fetch(API_URL, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${key()}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      messages,
+      max_tokens: maxTokens || 500,
+      temperature: temp || 0.85,
+    })
+  });
+  const d = await r.json();
+  if (d.error) throw new Error(d.error.message);
+  return d.choices?.[0]?.message?.content || '';
+}
 
 app.post('/story', async (req, res) => {
   try {
@@ -443,11 +428,10 @@ app.post('/story', async (req, res) => {
         console.error("GAMEDATA parse error:", e.message);
       }
     } else {
-      console.warn("No GAMEDATA found");
+      console.warn("No GAMEDATA found in response");
     }
 
     // Server-side enforcement
-    // Stat cap
     if (gd.statChanges) {
       let total = 0;
       for (const k of ['strength','agility','intelligence']) {
@@ -460,37 +444,30 @@ app.post('/story', async (req, res) => {
             gd.statChanges[k] = Math.floor(gd.statChanges[k] * r);
         }
       }
-      // HP delta cap
       if (gd.statChanges.hp) {
         gd.statChanges.hp = Math.max(-MAX_HP_DELTA,
           Math.min(MAX_HP_DELTA, gd.statChanges.hp));
       }
     }
 
-    // XP cap
     if (gd.xpGain > MAX_XP_GAIN) gd.xpGain = MAX_XP_GAIN;
 
-    // Ability tier gate by level
     if (gd.abilityUnlocked && gd.abilityUnlocked.name) {
       const lvl = playerData?.level || 1;
       const tierMin = { Basic:1, Advanced:6, Mastered:16 };
       const tier = gd.abilityUnlocked.tier || 'Basic';
       if (lvl < (tierMin[tier] || 1)) {
         gd.abilityUnlocked.tier = 'Basic';
-        console.log("Ability tier downgraded to Basic (level too low)");
       }
     }
 
-    // Reject empty battleTrigger
     if (gd.battleTrigger && !gd.battleTrigger.enemyName) {
       gd.battleTrigger = null;
     }
 
-    // badEventForPlayer boolean fix
     if (typeof gd.badEvent === 'boolean') gd.badEvent = null;
 
     console.log("battleTrigger:", gd.battleTrigger?.enemyName || 'none');
-    console.log("abilityUnlocked:", gd.abilityUnlocked?.name || 'none');
 
     res.json({ narrative, gameData: gd });
   } catch(e) {
@@ -505,7 +482,7 @@ app.post('/story', async (req, res) => {
 app.post('/create-world', async (req, res) => {
   try {
     const { worldDescription } = req.body;
-    console.log("Creating world:", worldDescription?.slice(0,50));
+    console.log("Creating world:", worldDescription?.slice(0,60));
 
     const raw = await callAI(
       [{ role:'system', content:WORLD_CREATION_PROMPT },
@@ -517,7 +494,7 @@ app.post('/create-world', async (req, res) => {
     try { data = JSON.parse(clean); }
     catch(e) {
       console.error("World creation parse error:", e.message);
-      return res.status(500).json({ error: "Parse failed" });
+      return res.status(500).json({ error:"Parse failed" });
     }
 
     res.json({ worldData: data });
@@ -529,21 +506,24 @@ app.post('/create-world', async (req, res) => {
 
 app.post('/battle', async (req, res) => {
   try {
-    const { playerData, enemy, abilityUsed, worldSetting } = req.body;
-    console.log(`Battle | Player Lv${playerData?.level} vs ${enemy?.enemyName} Lv${enemy?.enemyLevel}`);
+    const { playerData, enemy, abilityUsed,
+            worldSetting, isEnemyTurn } = req.body;
+
+    console.log(`Battle | ${isEnemyTurn?'Enemy':'Player'} turn | ${enemy?.enemyName} Lv${enemy?.enemyLevel}`);
 
     const abilStr = abilityUsed
-      ? `Player uses: ${abilityUsed.name} [${abilityUsed.type}/${abilityUsed.tier}] (${abilityUsed.description}, dmg: ${abilityUsed.damage})`
-      : 'Player uses basic attack';
+      ? `${isEnemyTurn ? 'Enemy' : 'Player'} uses: ${abilityUsed.name} [${abilityUsed.type||'physical'}] — ${abilityUsed.description} (dmg formula: ${abilityUsed.damage})`
+      : `${isEnemyTurn ? 'Enemy' : 'Player'} uses basic attack`;
 
     const ctx = `World: ${worldSetting}
 Player: Lv${playerData.level} | HP:${playerData.hp}/${playerData.maxHp} | STR:${playerData.strength} AGI:${playerData.agility} INT:${playerData.intelligence}
-${abilStr}
 Enemy: ${enemy.enemyName} (${enemy.enemyRace||'unknown'}) Lv${enemy.enemyLevel}
 Enemy HP: ${enemy.currentHp}/${enemy.enemyMaxHp}
 Enemy stats: STR:${enemy.enemyStr||10} AGI:${enemy.enemyAgi||10} INT:${enemy.enemyInt||10}
 Enemy dominant: ${enemy.enemyDominantStat||'strength'}
-Is boss: ${enemy.isBoss?'YES':'NO'}`;
+Is boss: ${enemy.isBoss?'YES':'NO'}
+This turn: ${isEnemyTurn ? 'ENEMY ATTACKS PLAYER' : 'PLAYER ATTACKS ENEMY'}
+${abilStr}`;
 
     const raw = await callAI(
       [{ role:'system', content:BATTLE_PROMPT },
@@ -552,12 +532,20 @@ Is boss: ${enemy.isBoss?'YES':'NO'}`;
 
     let result;
     try {
-      result = JSON.parse(raw.replace(/```json/g,'').replace(/```/g,'').trim());
+      result = JSON.parse(
+        raw.replace(/```json/g,'').replace(/```/g,'').trim());
     } catch(e) {
-      result = { battleLog:"The battle rages on...",
-        playerHpChange:-5, enemyHpChange:-10,
-        battleEnded:false, playerWon:false,
-        xpReward:0, itemDrop:'' };
+      result = {
+        battleLog: isEnemyTurn
+          ? `${enemy.enemyName} strikes!`
+          : "The battle continues...",
+        playerHpChange: isEnemyTurn ? -8 : 0,
+        enemyHpChange: isEnemyTurn ? 0 : -10,
+        battleEnded: false,
+        playerWon: false,
+        xpReward: 0,
+        itemDrop: ''
+      };
     }
 
     res.json({ turnResult: result });
@@ -567,9 +555,51 @@ Is boss: ${enemy.isBoss?'YES':'NO'}`;
   }
 });
 
+app.post('/enemy-abilities', async (req, res) => {
+  try {
+    const { enemyName, enemyLevel, enemyRace,
+            enemyDominantStat, worldSetting } = req.body;
+
+    console.log(`Enemy abilities for: ${enemyName} Lv${enemyLevel}`);
+
+    const ctx = `Enemy: ${enemyName} (${enemyRace||'unknown race'})
+Level: ${enemyLevel||1}
+Dominant stat: ${enemyDominantStat||'strength'}
+World: ${worldSetting}`;
+
+    const raw = await callAI(
+      [{ role:'system', content:ENEMY_ABILITIES_PROMPT },
+       { role:'user', content:ctx }],
+      300, 0.8);
+
+    let data;
+    try {
+      data = JSON.parse(
+        raw.replace(/```json/g,'').replace(/```/g,'').trim());
+    } catch(e) {
+      console.error("Enemy abilities parse error:", e.message);
+      data = {
+        abilities: [{
+          name: "Basic Attack",
+          description: "A direct strike.",
+          type: "physical",
+          damage: "STR x 1.0",
+          cooldown: 0
+        }]
+      };
+    }
+
+    res.json({ abilities: data.abilities || [] });
+  } catch(e) {
+    console.error("Enemy abilities error:", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.post('/world-event', async (req, res) => {
   try {
-    const { worldSetting, worldEvents, locationStates, playerLevel } = req.body;
+    const { worldSetting, worldEvents,
+            locationStates, playerLevel } = req.body;
 
     const ctx = `World: ${worldSetting}
 Player level: ${playerLevel||1}
@@ -583,7 +613,8 @@ Locations: ${JSON.stringify(locationStates||{}).slice(0,300)}`;
 
     let ev;
     try {
-      ev = JSON.parse(raw.replace(/```json/g,'').replace(/```/g,'').trim());
+      ev = JSON.parse(
+        raw.replace(/```json/g,'').replace(/```/g,'').trim());
     } catch(e) {
       return res.status(500).json({ error:"Parse failed" });
     }
@@ -604,9 +635,9 @@ app.post('/generate-map', async (req, res) => {
     console.log("Map - layer:", layer);
 
     const ctx = {
-      2:"High sky. Floating islands, celestial realms.",
-      1:"Elevated. Mountain peaks, high temples.",
-      0:"Ground level. Cities, villages, wilderness.",
+      2:   "High sky. Floating islands, celestial realms.",
+      1:   "Elevated. Mountain peaks, high temples.",
+      0:   "Ground level. Cities, villages, wilderness.",
       '-1':"Underground. Caves, buried ruins.",
       '-2':"Deep dungeon. Ancient vaults, boss chambers.",
       '-3':"Abyss. Void rifts, demon realms. High level only."
@@ -614,18 +645,21 @@ app.post('/generate-map', async (req, res) => {
 
     const raw = await callAI(
       [{ role:'system', content:MAP_PROMPT },
-       { role:'user', content:`Layer ${layer} (${layerName}) for: ${worldSetting}\nContext: ${ctx[String(layer)]||'appropriate locations'}` }],
+       { role:'user', content:
+         `Layer ${layer} (${layerName}) for: ${worldSetting}\n`
+         + `Context: ${ctx[String(layer)]||'appropriate'}` }],
       2500, 0.7);
 
     let mapData;
     try {
-      mapData = JSON.parse(raw.replace(/```json/g,'').replace(/```/g,'').trim());
+      mapData = JSON.parse(
+        raw.replace(/```json/g,'').replace(/```/g,'').trim());
     } catch(e) {
       console.error("Map parse error:", e.message);
       return res.status(500).json({ error:"Map parse failed" });
     }
 
-    console.log("Map generated:", mapData.locations?.length, "locations");
+    console.log("Map:", mapData.locations?.length, "locations");
     res.json({ mapData });
   } catch(e) {
     console.error("Map error:", e.message);
@@ -639,12 +673,14 @@ app.post('/inspect-npc', async (req, res) => {
 
     const raw = await callAI(
       [{ role:'system', content:INSPECT_PROMPT },
-       { role:'user', content:`NPC: ${npcName}\nKnown: ${JSON.stringify(npcData||{})}\nWorld: ${worldSetting}` }],
+       { role:'user', content:
+         `NPC: ${npcName}\nKnown: ${JSON.stringify(npcData||{})}\nWorld: ${worldSetting}` }],
       150, 0.7);
 
     let data;
     try {
-      data = JSON.parse(raw.replace(/```json/g,'').replace(/```/g,'').trim());
+      data = JSON.parse(
+        raw.replace(/```json/g,'').replace(/```/g,'').trim());
     } catch(e) {
       return res.status(500).json({ error:"Parse failed" });
     }
