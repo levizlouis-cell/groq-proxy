@@ -31,7 +31,7 @@ async function callAI(messages, maxTokens, temp) {
 
 function buildNPCContext(npcs) {
   if (!npcs || !Object.keys(npcs).length) return '';
-  let s = '\nKNOWN NPCs (remember EVERYTHING — appearance, personality, age never change):\n';
+  let s = '\nKNOWN NPCs (appearance, personality, age NEVER change):\n';
   for (const [name, n] of Object.entries(npcs)) {
     s += `- ${name}: attitude=${n.attitude||'unknown'}, level=${n.level||'?'}, race=${n.race||'?'}, age=${n.age||'?'}`;
     if (n.appearance) s += `, appearance=${n.appearance}`;
@@ -98,7 +98,6 @@ function buildSystemPrompt(pd, worldSetting,
   const traitStr    = (pd.traits||[])
     .map(t => t.name||t).join(', ') || 'none';
 
-  // Dynamic response length based on input
   let responseLen;
   if (inputLen <= 5)       responseLen = '1 short paragraph';
   else if (inputLen <= 20) responseLen = '2 paragraphs';
@@ -160,14 +159,32 @@ Context matters — no fire underwater, no boulders in tight corridors.
 RULE 3 — ITEM ENFORCEMENT — CRITICAL:
 Player can ONLY use items listed in "Inventory" above.
 Item not in inventory = narrate it simply isn't there.
-CRITICAL: If player gives, trades, drops, throws, sells, or hands over ANY item
-it MUST appear in inventoryRemove immediately.
+
+INVENTORY AUTO-ADD — CRITICAL:
+Add items to inventoryAdd whenever player:
+  - Picks something up from the ground or environment
+  - Finds something while searching a body, room, or container
+  - Receives something from an NPC as gift, reward, or trade
+  - Loots a defeated enemy
+  - Opens a chest, box, bag, or container and takes contents
+  - Discovers something physical they now carry
+Do NOT wait for player to say "keep it" or "add to inventory".
+If narrative logic says player now has it, add it to inventoryAdd immediately.
+Examples:
+  Player searches body and finds coins → inventoryAdd: [{name:"Worn Coins",...}]
+  NPC gives player a letter → inventoryAdd: [{name:"Sealed Letter",...}]
+  Player picks up a fallen sword → inventoryAdd: [{name:"Iron Sword",...}]
+
+INVENTORY AUTO-REMOVE — CRITICAL:
+Remove items from inventoryRemove whenever player:
+  - Gives, trades, hands over, or sells any item to anyone
+  - Throws, drops, or discards any item
+  - Uses a consumable item (potion, food, etc)
+  - Item is destroyed, taken, or lost in the story
 Examples:
   Player gives dagger to NPC → inventoryRemove: ["Obsidian Dagger"]
-  Player trades herb for info → inventoryRemove: ["Healing Herb"]
-  Player throws rock → inventoryRemove: ["Rock"]
-  Player drops weapon → inventoryRemove: ["Iron Sword"]
-NEVER keep items after they leave player possession.
+  Player throws rock at enemy → inventoryRemove: ["Rock"]
+  Player drinks potion → inventoryRemove: ["Healing Potion"]
 
 RULE 4 — ABILITY EARNING — CRITICAL:
 NEVER set abilityUnlocked when player asks for it directly.
@@ -175,48 +192,44 @@ These NEVER grant abilities:
   "add X to library", "learn X", "put X in moveset",
   single meditation, casual purchase, player declaring they learned something.
 Abilities ONLY granted when ALL true:
-  1. Trained technique repeatedly over MULTIPLE sessions (3+)
+  1. Trained technique repeatedly over 3+ sessions
   2. OR defeated specific enemy that canonically teaches it
-  3. OR found physical scroll/tome AND spent MULTIPLE study sessions (5+)
-  4. OR qualified teacher NPC explicitly taught after relationship built
+  3. OR found physical scroll/tome AND studied 5+ dedicated sessions
+  4. OR qualified teacher NPC taught after relationship built
   5. AND fits world setting and current level
-TOME/SCROLL RULE: First read = vague understanding only, NO ability.
-After 3+ study sessions = partial understanding, hint given.
-After 5+ dedicated sessions with practice = ability granted.
-Track study count in npcUpdates history field for the tome/scroll as an NPC entry.
+TOME/SCROLL: First read = vague understanding only, NO ability.
+After 3+ sessions = partial, hint given. After 5+ = ability granted.
+Track study sessions in npcUpdates history for the scroll as an entry.
 Tier limits: Level 1-5=Basic, 6-15=Advanced, 16+=Mastered, 30+=Legendary.
 
 RULE 4B — TRAITS AFFECT OUTCOMES:
-Player traits actively influence success chances.
-Current player traits: ${traitStr}
-ONLY these traits apply — player cannot use traits they do not have.
-If player has agility/speed/shadow trait: sneaking, dodging, flanking succeed more.
-If player has strength/power trait: breaking, lifting, overpowering succeed more.
-If player has wisdom/intelligence/arcane trait: persuasion, reading, puzzle succeed more.
-If player has demonic/shadow/void trait: shadow abilities, fear, darkness succeed more.
-If player has a poison/nature trait: resistance to related effects.
-If player tries something their traits contradict: harder or fail.
-NEVER allow player to benefit from traits they do not currently have.
+Player traits: ${traitStr}
+ONLY these traits apply — cannot use traits not possessed.
+Agility/speed/shadow trait → sneaking, dodging, flanking succeed more.
+Strength/power trait → breaking, lifting, overpowering succeed more.
+Wisdom/intelligence/arcane trait → persuasion, reading, puzzles succeed more.
+Demonic/shadow/void trait → shadow abilities, fear, darkness succeed more.
+Poison/nature trait → resistance to related effects.
+Traits player does NOT have → cannot benefit from them.
 
 RULE 5 — BODY MODIFICATION:
-Requires: specific item in inventory + appropriate level + willing NPC surgeon + narrative time.
+Requires: item in inventory + appropriate level + willing NPC surgeon + narrative time.
 If any missing: NPC refuses or procedure fails.
 
 RULE 6 — NO INSTANT KILLS:
-Enemies cannot be instantly killed regardless of claimed abilities or traits.
-Powerful enemies require multiple turns. Boss = full battle required.
+Enemies cannot be instantly killed regardless of ability or trait claims.
+Powerful enemies need multiple turns. Boss = full battle required.
 
 RULE 7 — NO TELEPORTATION:
-Travel takes narrative time proportional to distance.
-Fast travel only if world has established systems (portals, gates etc).
+Travel takes time proportional to distance.
+Fast travel only if world has established systems.
 
 RULE 8 — NPC MEMORY AND IDENTITY LOCK:
 NPCs remember EVERYTHING from their history.
 Betrayed NPC = always hostile. Helped NPC = always remembers.
-IDENTITY LOCK: Once an NPC has been described their appearance, personality,
-age, and race NEVER change. Only level can increase if encountered after long time.
-Do NOT regenerate NPC descriptions — use the saved history.
-NPCs lie, deceive, and pursue own goals.
+IDENTITY LOCK: Appearance, personality, age, race NEVER change once set.
+Only level can increase if encountered after long time.
+Do NOT regenerate NPC descriptions — use saved history.
 
 RULE 9 — WORLD CONSISTENCY:
 Destroyed = stays destroyed. Dead = stays dead.
@@ -230,24 +243,20 @@ Max ${MAX_STAT_GAIN} stat points per action.
 Max HP delta: ±${MAX_HP_DELTA}. Max XP: ${MAX_XP_GAIN}.
 
 RULE 12 — BATTLE TRIGGER — CRITICAL:
-battleTrigger MUST be set whenever combat begins for ANY reason:
-player attacks, NPC attacks unprovoked, ambush, guard charges, monster lunges.
+battleTrigger MUST be set whenever combat begins for ANY reason.
 NEVER narrate a fight without battleTrigger.
-NEVER resolve combat damage in narrative — battle UI handles all HP.
+NEVER resolve combat damage in narrative.
 When battleTrigger set: statChanges.hp = 0, xpGain = 0.
 
 RULE 13 — NPC HIGHLIGHTS:
-Every named NPC or enemy mentioned = nameHighlights entry.
-friendly=green, hostile=red, unknown=white. Include level if known.
+Every named NPC or enemy = nameHighlights entry.
+friendly=green, hostile=red, unknown=white. Include level.
 
 RULE 14 — LAYER CHANGES:
 currentLayer: null if unchanged. Only set if player moved to different layer.
-Never send 0 to mean unchanged — only send 0 if actually on ground layer.
 
 RULE 15 — TIMESKIP LIMIT:
-Player cannot skip more than 24 hours at once.
-"I meditate for 5 days" = only 24 hours pass, narrate accordingly.
-"I wait a week" = next morning only. Longer skips need multiple actions.
+Max 24 hours per action. Longer skips need multiple actions.
 
 ════════════════════════════════════════
 RESPONSE FORMAT
@@ -280,27 +289,28 @@ Then output this block exactly:
 </GAMEDATA>
 
 FIELD RULES:
-- statChanges.hp: DELTA only. -10=took 10 damage. 0=no change.
-  NEVER put current HP (${pd.hp}) here. MUST be 0 when battleTrigger set.
+- statChanges.hp: DELTA only. MUST be 0 when battleTrigger set.
+  NEVER put current HP (${pd.hp}) here.
 - statChanges.worldStats: world-specific deltas e.g. {"QI": 2}
-- xpGain: 0-50 normal non-combat only. 0 when battleTrigger set. Cap ${MAX_XP_GAIN}.
-- inventoryAdd: array of item objects:
-  { "name": "Item Name", "description": "Brief: where/how obtained under 10 words", "source": "Location or NPC" }
-  OR plain strings for very simple items.
-- inventoryRemove: strings of item names that left player possession this action.
-  ALWAYS include when player gives/trades/drops/throws/sells any item.
+- xpGain: non-combat only. 0 when battleTrigger set. Cap ${MAX_XP_GAIN}.
+- inventoryAdd: CRITICAL — add items here whenever player picks up, finds,
+  receives, loots, or takes anything physical. Do NOT wait to be asked.
+  Format: { "name": "Item Name", "description": "Brief origin under 10 words", "source": "Location or NPC" }
+  OR plain string for very simple items.
+- inventoryRemove: item name strings that LEFT player possession this action.
+  ALWAYS include when player gives/trades/drops/throws/uses/loses any item.
 - abilityUnlocked: null OR { name:"", description:"", type:"physical|demonic|divine|fire|ice|light|shadow|cursed|holy|chaos|order|arcane|nature|void", tier:"Basic", damage:"STR x 1.0", cooldown:0 }
 - traitGained: null OR { name:"", description:"", source:"" }
 - battleTrigger: null OR { enemyName:"", enemyLevel:1, enemyHp:100, enemyMaxHp:100, enemyStr:10, enemyAgi:10, enemyInt:10, enemyDominantStat:"strength", enemyDescription:"", enemyRace:"", isBoss:false }
-  enemyHp = 50 + (enemyLevel * 20). Stats vary by enemy type and dominant stat.
 - npcUpdates: { "Name": { attitude:"friendly|hostile|unknown", level:1, race:"", age:"", history:"", itemsTraded:"", promises:"", betrayals:"", appearance:"" } }
-  appearance field: set ONCE on first encounter and never change it after.
+  appearance: set ONCE on first encounter, never change after.
 - nameHighlights: [ { name:"", type:"npc|enemy", attitude:"friendly|hostile|unknown", level:1 } ]
 - badEvent: null OR { type:"ambush|disaster|betrayal|curse|injury|bounty", description:"", details:{} }
-- reputationChanges: { "FactionName": delta } — use faction names, positive=good, negative=bad.
-  Always include faction when player kills/spares/helps/harms someone affiliated.
-- currentLocation: where player is NOW (empty string if unchanged)
-- currentLayer: null if unchanged. Number only if moved to different layer.`;
+- reputationChanges: { "FactionName": delta } always include faction when player kills/spares/helps/harms affiliated person.
+- currentLocation: empty string if unchanged.
+- currentLayer: null if unchanged.
+CRITICAL REMINDER: You MUST end every response with the complete <GAMEDATA> block.
+Never cut the response before GAMEDATA. GAMEDATA is required on every single response.`;
 }
 
 const WORLD_CREATION_PROMPT = `You are a world builder for a dark anime text adventure RPG.
@@ -336,11 +346,11 @@ Return ONLY valid JSON, no markdown:
   "openingNarrative": "2 paragraphs setting the scene vividly"
 }
 Rules:
-- Generate 4-8 races fitting the world with varied appearances and abilities
+- Generate 4-8 races fitting the world with varied appearances
 - Player race randomly chosen — make it interesting
 - Starting ability random, fits world theme, has actual damage formula
 - statBonus total 2-4 points max
-- Trait must be narratively meaningful with a real passive effect`;
+- Trait must be narratively meaningful with real passive effect`;
 
 const BATTLE_PROMPT = `You are a battle resolver for a dark anime RPG.
 Resolve ONE turn and return ONLY valid JSON, no markdown:
@@ -354,15 +364,14 @@ Resolve ONE turn and return ONLY valid JSON, no markdown:
   "itemDrop": ""
 }
 DAMAGE RULES:
-- Physical abilities use STR stat for scaling
-- Shadow/void/arcane/demonic abilities use INT stat
-- Speed/agility abilities use AGI stat
+- Physical abilities use STR for scaling
+- Shadow/void/arcane/demonic use INT
+- Speed/agility abilities use AGI
 - Minimum damage per turn: 5
-- Maximum damage: enemy/player level * 8
-- NEVER return enemyHpChange = 0 on player turn unless ability explicitly missed
+- Maximum: level * 8
+- NEVER return enemyHpChange=0 on player turn unless explicitly missed
 - isEnemyTurn=true: enemy attacks, playerHpChange negative, enemyHpChange=0
 - isEnemyTurn=false: player attacks, enemyHpChange negative
-- Scale realistically: level 1 vs level 1 = 8-15 damage per hit
 - xpReward and itemDrop only when playerWon=true
 - xpReward: 20 + (enemyLevel * 10), doubled for bosses
 - battleEnded=true only when one side reaches 0 HP`;
@@ -383,11 +392,10 @@ Return ONLY valid JSON, no markdown:
 }
 Rules:
 - Must fit enemy type, race, and world setting
-- Scale power to enemy level — level 1 enemies hit for 8-15, level 10 for 30-60
-- Always include one basic attack with cooldown 0
-- Higher level enemies get more powerful and varied abilities
+- Scale power to enemy level
+- Always include one basic attack (cooldown 0)
 - Cooldowns: basic=0, special=1-2, powerful=3
-- Damage formula uses enemy's dominant stat`;
+- Damage formula uses enemy dominant stat`;
 
 const WORLD_EVENT_PROMPT = `You are a world event generator for a dark anime RPG.
 Generate one passive world event while player was busy.
@@ -404,8 +412,7 @@ Return ONLY valid JSON, no markdown:
   "severity": "minor|moderate|major",
   "badEventForPlayer": null
 }
-badEventForPlayer: null OR { type:"ambush|bounty", description:"" } — NEVER a boolean.
-Make events feel consequential and tied to the world setting.`;
+badEventForPlayer: null OR { type:"ambush|bounty", description:"" } — NEVER a boolean.`;
 
 const MAP_PROMPT = `You are a world map generator for a dark anime RPG.
 Return ONLY valid JSON, no markdown:
@@ -426,16 +433,14 @@ Return ONLY valid JSON, no markdown:
   ]
 }
 Rules:
-- 20-25 locations for layer 0, 10-15 for others
-- x/y between 0-100, 2-4 connections each
+- 20-25 locations layer 0, 10-15 others
+- x/y 0-100, 2-4 connections each
 - Exactly ONE isStarting=true near center
 - minLevel: starting=1, mid=5-10, dangerous=15-25
-- Mix location types — not all wilderness
-- Names should feel atmospheric and fit the world`;
+- Mix location types, atmospheric names`;
 
 const INSPECT_PROMPT = `You are an NPC inspector for a dark anime RPG.
-Generate inspection details based on what is known.
-Reveal only what makes sense given their history and relationship with player.
+Reveal only what makes sense given their history.
 Return ONLY valid JSON, no markdown:
 {
   "name": "Full name or ???",
@@ -443,11 +448,10 @@ Return ONLY valid JSON, no markdown:
   "age": "Age estimate or ???",
   "level": 1,
   "appearance": "2 sentence physical description",
-  "impression": "One sentence of what player senses about them",
+  "impression": "One sentence of what player senses",
   "attitude": "friendly|hostile|unknown"
 }
-Make the appearance memorable and specific to this NPC.
-Level should reflect their apparent power and experience.`;
+Make appearance memorable and specific. Level reflects power and experience.`;
 
 app.post('/story', async (req, res) => {
   try {
@@ -460,7 +464,6 @@ app.post('/story', async (req, res) => {
       + ` | ${playerData?.currentLocation}`
       + ` | inputLen:${inputLength||'?'}`);
 
-    // Inject input length for response scaling
     const pdWithLen = {
       ...playerData,
       _lastInputLen: inputLength || 10
@@ -471,11 +474,9 @@ app.post('/story', async (req, res) => {
       worldNPCs || {}, locationStates || {},
       worldRaces || {});
 
-    // Scale max tokens with input length
     let maxTok = 600;
     if ((inputLength||0) > 50) maxTok = 1000;
     else if ((inputLength||0) > 20) maxTok = 800;
-    else maxTok = 600;
 
     const raw = await callAI(
       [{ role:'system', content:prompt },
@@ -549,7 +550,6 @@ app.post('/story', async (req, res) => {
       const tier = gd.abilityUnlocked.tier || 'Basic';
       if (lvl < (tierMin[tier] || 1)) {
         gd.abilityUnlocked.tier = 'Basic';
-        console.log("Ability tier downgraded — level too low");
       }
     }
 
@@ -577,7 +577,8 @@ app.post('/story', async (req, res) => {
 
     console.log("battleTrigger:", gd.battleTrigger?.enemyName || 'none');
     console.log("abilityUnlocked:", gd.abilityUnlocked?.name || 'none');
-    console.log("inventoryRemove:", gd.inventoryRemove || []);
+    console.log("inv+:", gd.inventoryAdd?.length || 0,
+      "inv-:", gd.inventoryRemove?.length || 0);
 
     res.json({ narrative, gameData: gd });
   } catch(e) {
@@ -623,7 +624,7 @@ app.post('/battle', async (req, res) => {
 
     const who = isEnemyTurn ? 'Enemy' : 'Player';
     const abilStr = abilityUsed
-      ? `${who} uses: ${abilityUsed.name} [${abilityUsed.type||'physical'}] — ${abilityUsed.description} (dmg formula: ${abilityUsed.damage})`
+      ? `${who} uses: ${abilityUsed.name} [${abilityUsed.type||'physical'}] — ${abilityUsed.description} (dmg: ${abilityUsed.damage})`
       : `${who} uses basic attack`;
 
     const ctx = `World: ${worldSetting}
@@ -697,7 +698,6 @@ World: ${worldSetting||'unknown world'}`;
     try {
       data = JSON.parse(raw.replace(/```json/g,'').replace(/```/g,'').trim());
     } catch(e) {
-      console.error("Enemy abilities parse:", e.message);
       data = { abilities: [{
         name: "Basic Attack",
         description: "A direct strike.",
@@ -756,8 +756,8 @@ app.post('/generate-map', async (req, res) => {
       1:    "Elevated. Mountain peaks, ancient temples.",
       0:    "Ground level. Cities, villages, wilderness, ruins.",
       '-1': "Underground. Caves, buried cities, tunnels.",
-      '-2': "Deep dungeon. Ancient vaults, monster lairs, boss chambers.",
-      '-3': "The Abyss. Void rifts, demon realms. Only highest level reach here."
+      '-2': "Deep dungeon. Ancient vaults, monster lairs.",
+      '-3': "The Abyss. Void rifts, demon realms. Highest level only."
     };
 
     const raw = await callAI(
