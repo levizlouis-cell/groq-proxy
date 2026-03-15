@@ -811,5 +811,6 @@ app.get('/ping', (req, res) => {
   res.json({ status:'alive', model:MODEL });
 });
 
-app.listen(process.env.PORT || 3000,
-  () => console.log('Proxy running:', MODEL));
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, '0.0.0.0',
+  () => console.log('Proxy running:', MODEL, 'on port', PORT));
