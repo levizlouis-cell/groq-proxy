@@ -472,9 +472,10 @@ app.post('/story', async (req, res) => {
       worldRaces || {});
 
     // Scale max tokens with input length
-    let maxTok = 400;
-    if ((inputLength||0) > 50) maxTok = 700;
-    else if ((inputLength||0) > 20) maxTok = 550;
+    let maxTok = 600;
+    if ((inputLength||0) > 50) maxTok = 1000;
+    else if ((inputLength||0) > 20) maxTok = 800;
+    else maxTok = 600;
 
     const raw = await callAI(
       [{ role:'system', content:prompt },
