@@ -118,6 +118,37 @@ STRICT RULES:
 12. ENEMY BALANCE: Stats vary by race/history. Beatable at appropriate rank.
 13. INFORMATION HIDING: NPC details hidden until revealed. Enemy stats hidden.
 14. BAD EVENTS: Ambushes, betrayals, curses, injuries, bounties happen regularly.
+15. ABILITY ENFORCEMENT — CRITICAL:
+Player can ONLY use abilities they have learned.
+Player's known abilities: ${JSON.stringify((pd.abilities || []).filter(a => a && a.name).map(a => a.name))}
+If player tries to use ANY ability not in this list:
+  - The ability fails completely
+  - Describe it vividly: their body rejects it, the energy dissipates, nothing happens
+  - Do NOT grant the effect of the unknown ability
+  - Do NOT damage the enemy with it
+  - statChanges.hp for enemy = 0
+Examples of forbidden actions to block:
+  "I use void insta kill" → not in ability list → fails
+  "I cast fireball" → not in ability list → fails  
+  "I use my ultimate technique" → not in ability list → fails
+Only abilities explicitly listed above can be used successfully.
+Basic Punch is always available to everyone.
+16. ABILITY ENFORCEMENT — CRITICAL:
+Player's learned abilities will be injected into
+each message as "[Known abilities: ...]".
+Player can ONLY successfully use abilities from
+this list in combat.
+If player tries to use an ability NOT in their list:
+  - It fails completely and dramatically
+  - Their body rejects it, energy dissipates
+  - No damage is dealt
+  - statChanges for enemy = 0
+  - Narrate the failure vividly
+Basic Punch and unarmed physical actions (kick,
+punch, throw, tackle) are ALWAYS available
+regardless of ability list.
+Context matters — a player in a library cannot
+throw a boulder, a player underwater cannot use fire.
 ${bountiesStr !== 'none' ? `15. BOUNTY: ${bountiesStr} — bounty hunters may appear.` : ''}
 
 BATTLE TRIGGER RULE — CRITICAL:
@@ -175,7 +206,18 @@ FIELD RULES:
 - statChanges.hp: DELTA only. If no damage: 0. Current HP is ${pd.hp} — do NOT put this number here.
 - statChanges.worldStats: world-specific stat deltas e.g. {"QI": 2}
 - xpGain: 0-50 normal actions, 50-200 boss kills
-- abilityUnlocked: { slot: 1-6, name: "", tier: "Basic", description: "", damage: "", cooldown: 0 } or null
+- abilityUnlocked: null OR {
+    name: "Ability Name",
+    description: "What it does in one sentence",
+    type: "physical|demonic|divine|fire|ice|light|shadow|cursed|holy|chaos|order|arcane|nature|void",
+    tier: "Basic",
+    damage: "e.g. STR x 1.5 or INT x 2.0",
+    cooldown: 0
+  }
+  Set ONLY when player genuinely EARNS a new ability through story.
+  This goes to their ability LIBRARY not their 6 PvP slots.
+  Do NOT set for abilities they already know.
+  Do NOT set for basic physical actions like punch or kick.
 - badEvent: null OR { type: "ambush|disaster|betrayal|curse|injury|bounty", description: "", details: {} }
 - battleTrigger: REQUIRED when any combat occurs. { enemyName: "", enemyRank: "E", enemyLevel: 1, enemyDescription: "", enemyRace: "", strongestStat: "strength|agility|intelligence", isBoss: false }
 - npcUpdates: { "Name": { attitude: "friendly|neutral|hostile", lastLocation: "", history: "", revealed: { name: "", race: "", age: "" } } }
